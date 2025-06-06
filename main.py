@@ -101,4 +101,4 @@ for item in times:
 
 
 plt.plot(iis, ppoints)
-plt.savefig("image_sol.png")
+plt.savefig(f"image_{system_name}.png")
