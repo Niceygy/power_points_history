@@ -2,7 +2,8 @@ import datetime
 import requests, json
 from tqdm import tqdm
 from matplotlib import pyplot as plt
-import bz2
+import bz2, os
+import concurrent.futures
 
 system_name = input("Enter system name: ")
 
@@ -30,16 +31,18 @@ def corrected_control_pts(state: str, progress: float) -> float:
         return progress
 
 def dataed(ED_GALAXY_URL, system_name):
-    print(f"Loading data from {ED_GALAXY_URL}")
-    data = requests.get(ED_GALAXY_URL, stream=True)
+    if not os.path.exists(f"data/{ED_GALAXY_URL}"):
+        data = requests.get(f"https://edgalaxydata.space/EDDN/2025-06/{ED_GALAXY_URL}", stream=True)
+        print(f"Loading data from {ED_GALAXY_URL}")
+        with open(f"data/{ED_GALAXY_URL}", "wb") as f:
+            f.write(bz2.decompress(data.raw.read()))
     print("Loaded")
-    data = bz2.decompress(data.raw.read())
+    data = open(f"data/{ED_GALAXY_URL}", "rb").read()
     lines = []
     for line in tqdm(data.split(b"\n"), desc="Decompressing", unit=" lines"):
         if line:
             lines.append(line.decode())
     data = lines
-    total = len(data)
 
     last_date = None
 
@@ -57,10 +60,10 @@ def dataed(ED_GALAXY_URL, system_name):
 
             if "PowerplayState" in json_line["message"]:
                 state = json_line["message"]["PowerplayState"]
-                if "ControllingPower" in json_line["message"] and state != "Unoccupied":
-                    power = json_line["message"]["ControllingPower"]
-                elif "Powers" in json_line["message"]:
-                    power = json_line["message"]["Powers"][0]
+                # if "ControllingPower" in json_line["message"] and state != "Unoccupied":
+                #     power = json_line["message"]["ControllingPower"]
+                # elif "Powers" in json_line["message"]:
+                #     power = json_line["message"]["Powers"][0]
                     
 
                 try:
@@ -81,24 +84,23 @@ times = []
 ppoints = []
 
 
-def addto(ppoints, date):
-    _temp = dataed(f"https://edgalaxydata.space/EDDN/2025-06/Journal.FSDJump-2025-{date}.jsonl.bz2", system_name)
+def addto(date):
+    print(f"Date: {date} #######################################################################################")
+    # _temp = dataed(f"https://edgalaxydata.space/EDDN/2025-06/Journal.FSDJump-2025-{date}.jsonl.bz2", system_name)
+    _temp = dataed(f"Journal.FSDJump-2025-{date}.jsonl.bz2", system_name)
+    times.append(date)
     for i in range(len(_temp)):
         ppoints.append(_temp[i]['pts'])
-        times.append(_temp[i]['times'])
-    
-addto(ppoints, "06-01")
-addto(ppoints, "06-02")
-addto(ppoints, "06-03")
-addto(ppoints, "06-04")
-addto(ppoints, "06-05")
+        times.append("")
+        
+
+dates = ["06-01", "06-02", "06-03", "06-04", "06-05", "06-06"]
+for item in dates:
+    addto(item)
 
 
 
-iis = []
-for item in times:
-    iis.append(datetime.datetime.strptime(item, "%Y-%m-%dT%H:%M:%SZ"))
-
-
-plt.plot(iis, ppoints)
-plt.savefig(f"image_{system_name}.png")
+times = times[6:]
+plt.plot(times, ppoints)
+plt.title(system_name)
+plt.savefig(f"images/image_{system_name}.png")
